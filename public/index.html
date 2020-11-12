@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font@4.x/css/materialdesignicons.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+  <style type="text/css">
+    iframe pre {
+      color: white;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <v-app>
+    <v-main>
+      <v-container fluid>
+        <v-row>
+          <v-col v-for="(commands, container) in actions" :key="container">
+            <v-card flat>
+              <v-card-title><v-icon :color="getColor(container)" class="pr-1">mdi-docker</v-icon>{{ container }}</v-card-title>
+              <v-card-text>
+                <v-btn class="mr-4 mb-4" v-for="(action, index) in commands" :key="index" @click="run(container, action)" style="text-transform: none;">{{ action }}</v-btn>
+              </v-card-text>
+            </v-card>
+          </v-col>
+        </v-row>
+      </v-container>
+    </v-main>
+    <v-footer padless>
+      <v-tabs v-model="active" background-color="blue darken-3" show-arrows dark>
+        <v-tabs-slider color="white"></v-tabs-slider>
+        <v-tab :ripple="false" v-for="terminal in terminals" :key="terminal.id" style="text-transform: none;">{{ terminal.container }}> {{ terminal.cmd }}</v-tab>
+      </v-tabs>
+      <v-tabs-items v-model="active" style="width: 100%">
+        <v-tab-item v-for="terminal in terminals" :key="terminal.id">
+          <iframe frameborder="0" :src="terminal.url" style="background-color: black; color: white; width: 100%; height: 507px; padding: 10px 5px;"></iframe>
+        </v-tab-item>
+      </v-tabs-items>
+    </v-footer>
+  </v-app>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios@0.20.0/dist/axios.min.js"></script>
+<script>
+  new Vue({
+    el: '#app',
+    vuetify: new Vuetify(),
+    data: () => {
+      return {
+        tab: null,
+        actions: {},
+        cmd: '',
+        counter: 0,
+        terminals: [],
+        active: 0,
+        running: [],
+      };
+    },
+    async created() {
+      const params = new URLSearchParams(window.location.search);
+      const configUrl = params.get('config') ? params.get('config') : 'http://localhost:10000/api/config.json';
+      this.actions = (await axios.get(configUrl)).data;
+      const response = await axios.get('/api/containers');
+      this.running = response.data.running;
+    },
+    methods: {
+      run(container, cmd) {
+        const id = this.counter;
+        const fullCmd = this.prependDockerContainer(container, cmd);
+        console.log('Run command:', fullCmd);
+        const url = '/api?cmd='+encodeURIComponent(fullCmd);
+        this.terminals.push({
+          id: id,
+          container: container,
+          cmd: cmd,
+          url: url,
+        });
+        this.active = id;
+        this.counter++;
+      },
+      prependDockerContainer(container, cmd) {
+        return `docker exec -i ${container} bash -c '${cmd}'`;
+      },
+      getColor(container) {
+        if(this.running.length === 0) {
+          return 'darkgray';
+        }
+        else if(this.running.includes(container)) {
+          return 'blue';
+        } else {
+          return 'red';
+        }
+      }
+    },
+  })
+</script>
+</body>
+</html>
